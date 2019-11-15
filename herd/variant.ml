@@ -41,7 +41,8 @@ type t =
 (* Branch speculation+ cat computation of dependencies *)
   | Deps
   | Instances (* Compute dependencies on instruction instances *)
-
+  | Kvm
+  
 let tags =
   ["success";"instr";"specialx0";"normw";"acqrelasfence";"backcompat";
    "fullscdepend";"splittedrmw";"switchdepscwrite";"switchdepscresult";"lrscdiffok";
@@ -69,6 +70,7 @@ let parse s = match Misc.lowercase s with
 | "toofar" -> Some TooFar
 | "deps" -> Some Deps
 | "instances"|"instance" -> Some Instances
+| "kvm" -> Some Kvm
 | _ -> None
 
 let pp = function
@@ -92,6 +94,7 @@ let pp = function
   | TooFar -> "TooFar"
   | Deps -> "Deps"
   | Instances -> "Instances"
+  | Kvm -> "kvm" 
 
 let compare = compare
 
