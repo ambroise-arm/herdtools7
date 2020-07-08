@@ -186,13 +186,15 @@ module Make
       let unv = lazy begin E.EventRel.cartesian evts evts  end in
       let ks = { I.id; unv; evts; conc; po;} in
       let si = lazy begin
+        let id_mem =
+          E.EventRel.set_to_rln (Lazy.force mem_evts) in
         if mixed then
           E.EventRel.unions
-            (E.EventSetSet.map_list
+            (id_mem::
+             E.EventSetSet.map_list
                (fun sm -> E.EventRel.cartesian sm sm)
                conc.S.str.E.sca)
-        else
-          E.EventRel.set_to_rln (Lazy.force mem_evts)
+        else id_mem
       end in
       let rf_reg = lazy (U.make_rf_regs conc) in
 (* Initial env *)
