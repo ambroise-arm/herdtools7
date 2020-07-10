@@ -1020,6 +1020,12 @@ Monad type:
         | V.Val (Symbolic (System (TAG,_))) -> true
         | _ -> false
 
+      let is_pteloc a =
+        let open Constant in
+        match a with
+        | V.Val (Symbolic (System (PTE,_))) -> true
+        | _ -> false
+
       let add_inittags env =
         let glob,tag =
           List.fold_left
@@ -1033,14 +1039,18 @@ Monad type:
         let env =
           List.fold_left
             (fun env a ->
-              let atag =  V.op1 Op.TagLoc a in
-              if A.VSet.mem atag tag_set then env
-              else begin
-                if dbg then
-                  Printf.eprintf "Tag %s for %s defaulting\n"
-                    (A.V.pp_v atag) (A.V.pp_v a) ;
-                (A.Location_global atag,A.V.Val (Constant.default_tag))::env
-              end)
+              if not (is_pteloc a) then
+              begin
+                let atag =  V.op1 Op.TagLoc a in
+                if A.VSet.mem atag tag_set then env
+                else begin
+                  if dbg then
+                    Printf.eprintf "Tag %s for %s defaulting\n"
+                      (A.V.pp_v atag) (A.V.pp_v a) ;
+                  (A.Location_global atag,A.V.Val (Constant.default_tag))::env
+                end
+              end
+              else env)
             env glob in
         env
 
@@ -1109,7 +1119,7 @@ Monad type:
                 let tr_sym sym = V.Val (Symbolic sym) in
                 let a_sym = tr_sym a in
                 begin match a with
-                | Physical _ -> (A.Location_global a_sym,v)::env
+                | System (TAG,_) | Physical _ -> (A.Location_global a_sym,v)::env
                 | System (PTE,_) -> 
                   if C.debug.Debug_herd.mem then begin
                   Printf.printf "env PTE: %s\n" (A.pp_location (A.Location_global a_sym)) end;

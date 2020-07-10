@@ -140,6 +140,7 @@ module Make
         let oloc = if AArch64Base.DC.sw op then None else Some loc in
         M.mk_singleton_es (Act.DC (op,oloc)) ii
 
+
 (******************)
 (* Memory Tagging *)
 (******************)
@@ -148,7 +149,6 @@ module Make
 (* Decompose tagged location *)
       let tag_extract a = M.op1 Op.TagExtract a
       let loc_extract a = M.op1 Op.LocExtract a
-
 
 (*  Low level tag access *)
       let do_read_tag a ii =
@@ -381,6 +381,8 @@ module Make
           (read_reg_ord rs ii >>| read_reg_ord r ii) >>= fun (v1,v2) ->
             M.add v1 v2
 
+      
+(*
       let lift_memop dir mop ma an ii =
         if memtag then
           M.delay ma >>= fun (_,ma) ->
@@ -400,6 +402,39 @@ module Make
                   (fun ma a -> ma >>= fun _ -> mk_fault a ii
                       >>! if C.precision then B.Exit else B.ReExec)
             | ac -> mop ac ma >>! B.Next
+        else
+          mop Act.A_VIR ma >>! B.Next
+*)
+
+        let lift_memtag mop ma ii =
+          M.delay ma >>= fun (_,ma) ->
+          let mm = mop Act.A_VIR (ma >>= fun a -> loc_extract a) in
+          delayed_check_tags ma ii
+            (mm  >>! B.Next)
+            (let mfault = ma >>= fun a -> mk_fault a ii in
+            if C.precision then  mfault >>! B.Exit
+           else (mfault >>| mm) >>! B.Next)
+
+        let lift_kvm dir mop ma an ii mphy =
+          M.delay ma >>= fun (a,ma) ->
+            match Act.access_of_location_std (A.Location_global a) with
+            | Act.A_VIR ->
+                check_ptw dir a ma an ii
+                  (mop Act.A_PTE ma >>! B.Next)
+                  mphy
+                  (fun ma a -> ma >>= fun _ -> mk_fault a ii
+                      >>! if C.precision then B.Exit else B.ReExec)
+            | ac -> mop ac ma >>! B.Next
+
+        let lift_memop dir mop ma an ii =
+        if memtag then 
+          if kvm then 
+            let mphy = (fun ma _a -> lift_memtag mop ma ii) in
+            lift_kvm dir mop ma an ii mphy
+          else lift_memtag mop ma ii
+        else if kvm then
+          let mphy = (fun ma _a -> mop Act.A_PHY ma >>! B.Next) in
+          lift_kvm dir mop ma an ii mphy
         else
           mop Act.A_VIR ma >>! B.Next
 
@@ -632,14 +667,14 @@ module Make
             end >>= fun (v,a) ->
             M.op1 Op.TagLoc a  >>= fun a ->
             do_write_tag a v ii >>! B.Next
-
+ 
         | I_LDG (rt,rn,kr) ->
             if not memtag then Warn.user_error "LDG without -variant memtag" ;
             begin
               read_reg_ord rt ii >>|
               (get_ea rn kr ii  >>= fun a ->
                M.op1 Op.TagLoc a  >>= fun a ->
-               do_read_tag a ii)
+               do_read_tag a ii) 
             end >>= fun (old,tag) ->
             M.op Op.SetTag old tag >>= fun v ->
             write_reg rt v ii >>! B.Next
